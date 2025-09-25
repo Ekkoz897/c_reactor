@@ -6,7 +6,7 @@
 /*   By: apereira <apereira@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/24 16:01:51 by apereira          #+#    #+#             */
-/*   Updated: 2025/09/24 16:02:01 by apereira         ###   ########.fr       */
+/*   Updated: 2025/09/25 19:26:20 by apereira         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -54,4 +54,66 @@ static struct cell	*allocate_compute2_cell(reactor_t *r)
 	cell->type = compute2;
 	cell->next_callback_id = 1;
 	return (cell);
+}
+
+/*
+** Run all registered callbacks for a given cell.
+*/
+static void	fire_cell_callbacks(struct cell *cell)
+{
+	callback_node_t	*cbn;
+
+	for (cbn = cell->callbacks; cbn; cbn = cbn->next)
+		cbn->cb(cbn->obj, cell->value);
+}
+
+static void	init_input_cell(struct cell *cell, int initial_value)
+{
+	cell->value = initial_value;
+}
+
+/*
+** Initialize a compute1 cell depending on one input.
+*/
+static void	init_compute1_cell(
+	struct cell *cell, struct cell *dep, compute1_t compute)
+{
+	compute1_cell_t	*c1;
+
+	c1 = (compute1_cell_t *)cell;
+	c1->dependency = dep;
+	c1->compute = compute;
+	c1->base.value = compute(dep->value);
+}
+
+/*
+** Initialize a compute2 cell depending on two inputs.
+*/
+static void	init_compute2_cell(
+	struct cell *cell, struct cell *dep1,
+	struct cell *dep2, compute2_t compute)
+{
+	compute2_cell_t	*c2;
+
+	c2 = (compute2_cell_t *)cell;
+	c2->dependency1 = dep1;
+	c2->dependency2 = dep2;
+	c2->compute = compute;
+	c2->base.value = compute(dep1->value, dep2->value);
+}
+
+static void	add_cell_to_reactor(reactor_t *r, struct cell *cell)
+{
+	cell->next = r->cells;
+	r->cells = cell;
+}
+
+static void	add_dependent(struct cell *dependency, struct cell *dependent)
+{
+	cell_node_t	*node;
+
+	node = critical_malloc(sizeof(*node), "add_dependent");
+	node->cell = dependent;
+	node->next = dependency->dependents;
+	dependency->dependents = node;
 }
