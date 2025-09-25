@@ -6,7 +6,7 @@
 /*   By: apereira <apereira@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/24 16:01:51 by apereira          #+#    #+#             */
-/*   Updated: 2025/09/25 19:26:58 by apereira         ###   ########.fr       */
+/*   Updated: 2025/09/25 19:35:35 by apereira         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -194,3 +194,73 @@ static void	propagate_changes(struct cell *start_cell)
 	update_values_until_stable(r);
 	fire_callbacks_for_changed_cells(r);
 }
+
+/* ************************************************************************** */
+/* HELPERS                                                                    */
+/* ************************************************************************** */
+
+/*
+** critical_malloc:
+** Safe malloc: aborts on failure.
+*/
+static void	*critical_malloc(size_t size, const char *context)
+{
+	void	*ptr;
+
+	ptr = malloc(size);
+	if (ptr)
+		return (ptr);
+	fprintf(stderr, "fatal: allocation failed in %s\n", context);
+	abort();
+	return (NULL);
+}
+
+static void	free_callbacks(callback_node_t *head)
+{
+	callback_node_t	*next;
+
+	while (head)
+	{
+		next = head->next;
+		free(head);
+		head = next;
+	}
+}
+
+static void	free_dependents(cell_node_t *head)
+{
+	cell_node_t	*next;
+
+	while (head)
+	{
+		next = head->next;
+		free(head);
+		head = next;
+	}
+}
+
+static callback_node_t	*find_callback_node(struct cell *cell, callback_id id)
+{
+	callback_node_t	*node;
+
+	for (node = cell->callbacks; node; node = node->next)
+		if (node->id == id)
+			return (node);
+	return (NULL);
+}
+
+static void	unlink_callback_node(struct cell *cell, callback_node_t *node)
+{
+	callback_node_t	**indirect;
+
+	indirect = &cell->callbacks;
+	while (*indirect && *indirect != node)
+		indirect = &(*indirect)->next;
+	if (*indirect == node)
+	{
+		*indirect = node->next;
+		free(node);
+	}
+}
+
+
