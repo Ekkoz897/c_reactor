@@ -6,7 +6,7 @@
 /*   By: apereira <apereira@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/24 16:01:51 by apereira          #+#    #+#             */
-/*   Updated: 2025/09/25 19:35:35 by apereira         ###   ########.fr       */
+/*   Updated: 2025/09/26 13:02:00 by apereira         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -264,3 +264,110 @@ static void	unlink_callback_node(struct cell *cell, callback_node_t *node)
 }
 
 
+/* ************************************************************************** */
+/* PUBLIC API                                                                 */
+/* ************************************************************************** */
+
+void	destroy_reactor(reactor_t *r)
+{
+	struct cell	*current;
+	struct cell	*next;
+
+	if (!r)
+		return ;
+	current = r->cells;
+	while (current)
+	{
+		next = current->next;
+		free_callbacks(current->callbacks);
+		free_dependents(current->dependents);
+		free(current);
+		current = next;
+	}
+	free(r);
+}
+
+struct cell	*create_input_cell(reactor_t *r, int initial_value)
+{
+	struct cell	*cell;
+
+	cell = allocate_input_cell(r);
+	if (!cell)
+		return (NULL);
+	init_input_cell(cell, initial_value);
+	add_cell_to_reactor(r, cell);
+	return (cell);
+}
+
+struct cell	*create_compute1_cell(
+	reactor_t *r, struct cell *dep, compute1_t compute)
+{
+	struct cell	*cell;
+
+	cell = allocate_compute1_cell(r);
+	if (!cell)
+		return (NULL);
+	init_compute1_cell(cell, dep, compute);
+	add_dependent(dep, cell);
+	add_cell_to_reactor(r, cell);
+	return (cell);
+}
+
+struct cell	*create_compute2_cell(
+	reactor_t *r, struct cell *dep1,
+	struct cell *dep2, compute2_t compute)
+{
+	struct cell	*cell;
+
+	cell = allocate_compute2_cell(r);
+	if (!cell)
+		return (NULL);
+	init_compute2_cell(cell, dep1, dep2, compute);
+	add_dependent(dep1, cell);
+	add_dependent(dep2, cell);
+	add_cell_to_reactor(r, cell);
+	return (cell);
+}
+
+int	get_cell_value(struct cell *cell)
+{
+	return (cell->value);
+}
+
+void	set_cell_value(struct cell *cell, int new_value)
+{
+	if (!cell || cell->type != input)
+		return ;
+	if (cell->value == new_value)
+		return ;
+	cell->value = new_value;
+	propagate_changes(cell);
+}
+
+callback_id	add_callback(struct cell *cell, void *obj, callback cb)
+{
+	callback_node_t	*node;
+
+	if (!cell || !cb)
+		return (callback_invalid);
+	node = malloc(sizeof(*node));
+	if (!node)
+		return (callback_invalid);
+	node->id = cell->next_callback_id++;
+	node->obj = obj;
+	node->cb = cb;
+	node->next = cell->callbacks;
+	cell->callbacks = node;
+	return (node->id);
+}
+
+void	remove_callback(struct cell *cell, callback_id id)
+{
+	callback_node_t	*node;
+
+	if (!cell || id == callback_invalid)
+		return ;
+	node = find_callback_node(cell, id);
+	if (node)
+		unlink_callback_node(cell, node);
+}
