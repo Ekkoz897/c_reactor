@@ -6,12 +6,80 @@
 /*   By: apereira <apereira@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/24 16:01:51 by apereira          #+#    #+#             */
-/*   Updated: 2025/09/26 13:02:00 by apereira         ###   ########.fr       */
+/*   Updated: 2025/09/26 13:08:39 by apereira         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "reactor.h"
 
+
+/* ************************************************************************** */
+/* HELPERS                                                                    */
+/* ************************************************************************** */
+
+/*
+** critical_malloc:
+** Safe malloc: aborts on failure.
+*/
+static void	*critical_malloc(size_t size, const char *context)
+{
+	void	*ptr;
+
+	ptr = malloc(size);
+	if (ptr)
+		return (ptr);
+	fprintf(stderr, "fatal: allocation failed in %s\n", context);
+	abort();
+	return (NULL);
+}
+
+static void	free_callbacks(callback_node_t *head)
+{
+	callback_node_t	*next;
+
+	while (head)
+	{
+		next = head->next;
+		free(head);
+		head = next;
+	}
+}
+
+static void	free_dependents(cell_node_t *head)
+{
+	cell_node_t	*next;
+
+	while (head)
+	{
+		next = head->next;
+		free(head);
+		head = next;
+	}
+}
+
+static callback_node_t	*find_callback_node(struct cell *cell, callback_id id)
+{
+	callback_node_t	*node;
+
+	for (node = cell->callbacks; node; node = node->next)
+		if (node->id == id)
+			return (node);
+	return (NULL);
+}
+
+static void	unlink_callback_node(struct cell *cell, callback_node_t *node)
+{
+	callback_node_t	**indirect;
+
+	indirect = &cell->callbacks;
+	while (*indirect && *indirect != node)
+		indirect = &(*indirect)->next;
+	if (*indirect == node)
+	{
+		*indirect = node->next;
+		free(node);
+	}
+}
 
 /* ************************************************************************** */
 /* CORE OPERATIONS                                                            */
@@ -196,77 +264,19 @@ static void	propagate_changes(struct cell *start_cell)
 }
 
 /* ************************************************************************** */
-/* HELPERS                                                                    */
-/* ************************************************************************** */
-
-/*
-** critical_malloc:
-** Safe malloc: aborts on failure.
-*/
-static void	*critical_malloc(size_t size, const char *context)
-{
-	void	*ptr;
-
-	ptr = malloc(size);
-	if (ptr)
-		return (ptr);
-	fprintf(stderr, "fatal: allocation failed in %s\n", context);
-	abort();
-	return (NULL);
-}
-
-static void	free_callbacks(callback_node_t *head)
-{
-	callback_node_t	*next;
-
-	while (head)
-	{
-		next = head->next;
-		free(head);
-		head = next;
-	}
-}
-
-static void	free_dependents(cell_node_t *head)
-{
-	cell_node_t	*next;
-
-	while (head)
-	{
-		next = head->next;
-		free(head);
-		head = next;
-	}
-}
-
-static callback_node_t	*find_callback_node(struct cell *cell, callback_id id)
-{
-	callback_node_t	*node;
-
-	for (node = cell->callbacks; node; node = node->next)
-		if (node->id == id)
-			return (node);
-	return (NULL);
-}
-
-static void	unlink_callback_node(struct cell *cell, callback_node_t *node)
-{
-	callback_node_t	**indirect;
-
-	indirect = &cell->callbacks;
-	while (*indirect && *indirect != node)
-		indirect = &(*indirect)->next;
-	if (*indirect == node)
-	{
-		*indirect = node->next;
-		free(node);
-	}
-}
-
-
-/* ************************************************************************** */
 /* PUBLIC API                                                                 */
 /* ************************************************************************** */
+
+reactor_t    *create_reactor(void)
+{
+	reactor_t *r;
+
+	r = malloc(sizeof(*r));
+	if (!r)
+		return (NULL);
+	r->cells = NULL;
+	return (r);
+}
 
 void	destroy_reactor(reactor_t *r)
 {
@@ -371,3 +381,33 @@ void	remove_callback(struct cell *cell, callback_id id)
 	if (node)
 		unlink_callback_node(cell, node);
 }
+
+/* ************************************************************************** */
+/* Testing                                                                    */
+/* ************************************************************************** */
+
+// int add(int a, int b) { return a + b; }
+
+// void on_change(void *obj, int new_val)
+// {
+//     (void)obj;
+//     printf("Cell changed: %d\n", new_val);
+// }
+
+// int main(void)
+// {
+//     reactor_t    *r = create_reactor();
+//     struct cell  *a = create_input_cell(r, 2);
+//     struct cell  *b = create_input_cell(r, 3);
+//     struct cell  *sum = create_compute2_cell(r, a, b, &add);
+
+//     add_callback(sum, NULL, on_change);
+
+//     set_cell_value(a, 10); // triggers callback
+//     set_cell_value(b, 20); // triggers callback
+
+//     printf("Final sum: %d\n", get_cell_value(sum));
+
+//     destroy_reactor(r);
+//     return (0);
+// }
